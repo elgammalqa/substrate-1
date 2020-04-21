@@ -350,6 +350,8 @@ pub trait Trait: frame_system::Trait {
 	type ValidatorId: Member + Parameter;
 
 	/// A conversion from account ID to validator ID.
+	///
+	/// Its cost must be at most one storage read.
 	type ValidatorIdOf: Convert<Self::AccountId, Option<Self::ValidatorId>>;
 
 	/// Indicator for when to end the session.
@@ -493,12 +495,16 @@ decl_module! {
 		/// The dispatch origin of this function must be signed.
 		///
 		/// # <weight>
-		/// - O(log n) in number of accounts.
-		/// - One extra DB entry.
-		/// - Increases system account refs by one on success iff there were previously no keys set.
-		///   In this case, purge_keys will need to be called before the account can be removed.
+		/// - Complexity: `O(1)`
+		///   Actual cost depends on the number of length of `T::Keys::key_ids()` which is fixed.
+		/// - DbReads: `sender account`, `T::ValidatorIdOf`, `NextKeys`
+		/// - DbWrites: `sender account`, `NextKeys`
+		/// - DbReads per key id: `KeyOwner`
+		/// - DbWrites per key id: `KeyOwner`
 		/// # </weight>
-		#[weight = SimpleDispatchInfo::FixedNormal(150_000_000)]
+		#[weight = 196_400_000
+			+ T::DbWeight::get().reads(2 + T::Keys::key_ids().len())
+			+ T::DbWeight::get().writes(1 + T::Keys::key_ids().len())]
 		pub fn set_keys(origin, keys: T::Keys, proof: Vec<u8>) -> dispatch::DispatchResult {
 			let who = ensure_signed(origin)?;
 
@@ -515,11 +521,13 @@ decl_module! {
 		/// The dispatch origin of this function must be signed.
 		///
 		/// # <weight>
-		/// - O(N) in number of key types.
-		/// - Removes N + 1 DB entries.
-		/// - Reduces system account refs by one on success.
+		/// - Complexity: `O(1)` in number of key types.
+		///   Actual cost depends on the number of length of `T::Keys::key_ids()` which is fixed.
+		/// - DbReads: `T::ValidatorIdOf`, `NextKeys`, `sender account`
+		/// - DbWrites: `NextKeys`, `sender account`
+		/// - DbWrites per key id: `KeyOwnder`
 		/// # </weight>
-		#[weight = SimpleDispatchInfo::FixedNormal(150_000_000)]
+		#[weight = 113_900_000 + T::DbWieght::get().reads_writes(2, 1 + T::Keys::key_ids().len())]
 		pub fn purge_keys(origin) {
 			let who = ensure_signed(origin)?;
 			Self::do_purge_keys(&who)?;
