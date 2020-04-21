@@ -24,13 +24,16 @@ mod common;
 
 #[test]
 fn check_block_works() {
-	let base_path = tempdir().expect("could not create a temp dir");
+	// let base_path = tempdir().expect("could not create a temp dir");
+	// let base_path = base_path.path();
+	let base_path = std::path::PathBuf::from("/tmp/xxx");
+	let base_path = base_path.as_path();
 
-	common::run_dev_node_for_a_while(base_path.path());
+	common::run_dev_node_for_a_while(base_path);
 
 	let status = Command::new(cargo_bin("substrate"))
 		.args(&["check-block", "--dev", "--pruning", "archive", "-d"])
-		.arg(base_path.path())
+		.arg(base_path)
 		.arg("1")
 		.status()
 		.unwrap();
